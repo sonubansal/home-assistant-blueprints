@@ -1,5 +1,5 @@
 blueprint:
-  name: Door Light with Motion Override and Door-Close Delay
+  name: Door Light with Motion Override and Door-Close Delay (Optional Motion)
   description: >
     Turns on a light when a door opens. Turns it off when the door closes
     after an optional delay, or when no motion is detected for a set time
@@ -15,7 +15,7 @@ blueprint:
 
     motion_sensor:
       name: Motion Sensor (optional)
-      default: []
+      default: null
       selector:
         entity:
           domain: binary_sensor
@@ -42,23 +42,32 @@ blueprint:
 mode: restart
 
 trigger:
+  # Door opens always triggers automation
   - platform: state
     entity_id: !input door_sensor
     to: "on"
+  {% if blueprint.inputs.motion_sensor is not none %}
+  # Motion stop triggers only if motion sensor exists
+  - platform: state
+    entity_id: !input motion_sensor
+    to: "off"
+  {% endif %}
 
 action:
-  # Turn light ON immediately when door opens
+  # Turn light ON immediately
   - service: light.turn_on
     target: !input light_target
 
-  # Wait for either door closes OR motion stops (if motion configured)
+  # Wait for either door close OR motion stop (if motion sensor exists)
   - wait_for_trigger:
       - platform: state
         entity_id: !input door_sensor
         to: "off"
+      {% if blueprint.inputs.motion_sensor is not none %}
       - platform: state
         entity_id: !input motion_sensor
         to: "off"
+      {% endif %}
 
   - choose:
       # -----------------------
@@ -79,7 +88,7 @@ action:
               {{ motion == none or is_state(motion, 'off') }}
 
       # -----------------------
-      # Door open + no motion
+      # Door open + no motion path
       # -----------------------
       - conditions:
           - condition: template
@@ -87,9 +96,9 @@ action:
               {% set motion = blueprint.inputs.motion_sensor %}
               {{ is_state(blueprint.inputs.door_sensor, 'on') and (motion == none or is_state(motion, 'off')) }}
         sequence:
-          - delay: !input no_motion_delay
+          - delay: !input.no_motion_delay
 
-  # Final safety check before turning off
+  # Final safety check before turning off light
   - condition: state
     entity_id: !input door_sensor
     state: "off"

@@ -1,9 +1,9 @@
 blueprint:
-  name: Door Light with Optional Motion and Door-Close Delay
+  name: Door Light with Motion and Delay (UI-safe)
   description: >
-    Turns on a light when a door opens. Turns it off when the door closes
-    after an optional delay, or when no motion is detected for a set time
-    while the door remains open. Motion sensor is optional.
+    Turns on a light when a door opens. Turns it off after an optional
+    door-close delay or no-motion delay while the door is open. Motion
+    sensor is optional.
   domain: automation
 
   input:
@@ -47,11 +47,11 @@ trigger:
     to: "on"
 
 action:
-  # Turn light ON immediately
+  # Turn light on immediately
   - service: light.turn_on
     target: !input light_target
 
-  # Wait for either door closes OR motion stops
+  # Wait until either door closes or motion stops
   - wait_for_trigger:
       - platform: state
         entity_id: !input door_sensor
@@ -61,34 +61,38 @@ action:
           {% set motion = blueprint.inputs.motion_sensor %}
           {{ motion is not none and is_state(motion, 'off') }}
 
-  # Choose which delay to apply
+  # Door closed path
   - choose:
-      # Door closed path
       - conditions:
           - condition: state
             entity_id: !input door_sensor
             state: "off"
         sequence:
-          # Delay after door closes
-          - delay:
-              seconds: "{{ (!input.door_closed_delay).total_seconds() | int }}"
-          # Motion veto
+          # Wait for door-closed delay using wait_template
+          - wait_template: >
+              {% set delay_seconds = blueprint.inputs.door_closed_delay.total_seconds() | int %}
+              {% set start = now() %}
+              {{ (now() - start).total_seconds() >= delay_seconds }}
+          # Check motion sensor before turning off
           - condition: template
             value_template: >
               {% set motion = blueprint.inputs.motion_sensor %}
               {{ motion is none or is_state(motion, 'off') }}
 
-      # Door open + no motion
+      # Door open + no motion path
       - conditions:
           - condition: template
             value_template: >
               {% set motion = blueprint.inputs.motion_sensor %}
               {{ is_state(blueprint.inputs.door_sensor, 'on') and (motion is none or is_state(motion, 'off')) }}
         sequence:
-          - delay:
-              seconds: "{{ (!input.no_motion_delay).total_seconds() | int }}"
+          # Wait for no-motion delay using wait_template
+          - wait_template: >
+              {% set delay_seconds = blueprint.inputs.no_motion_delay.total_seconds() | int %}
+              {% set start = now() %}
+              {{ (now() - start).total_seconds() >= delay_seconds }}
 
-  # Final safety check
+  # Final safety checks
   - condition: state
     entity_id: !input.door_sensor
     state: "off"
@@ -97,6 +101,6 @@ action:
       {% set motion = blueprint.inputs.motion_sensor %}
       {{ motion is none or is_state(motion, 'off') }}
 
-  # Turn light OFF
+  # Turn light off
   - service: light.turn_off
     target: !input.light_target

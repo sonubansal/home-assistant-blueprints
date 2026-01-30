@@ -47,7 +47,7 @@ trigger:
     to: "on"
 
 action:
-  # Turn light ON
+  # Turn light ON immediately when door opens
   - service: light.turn_on
     target: !input light_target
 
@@ -56,7 +56,6 @@ action:
       - platform: state
         entity_id: !input door_sensor
         to: "off"
-
       - platform: state
         entity_id: !input motion_sensor
         to: "off"
@@ -73,7 +72,7 @@ action:
           # Optional delay after door closes
           - delay: !input door_closed_delay
 
-          # Motion veto during delay
+          # Motion veto during delay (optional)
           - condition: template
             value_template: >
               {% set motion = blueprint.inputs.motion_sensor %}
@@ -86,11 +85,11 @@ action:
           - condition: template
             value_template: >
               {% set motion = blueprint.inputs.motion_sensor %}
-              {{ states(!input door_sensor) == 'on' and motion != none and is_state(motion, 'off') }}
+              {{ is_state(blueprint.inputs.door_sensor, 'on') and (motion == none or is_state(motion, 'off')) }}
         sequence:
           - delay: !input no_motion_delay
 
-  # Final safety check (always)
+  # Final safety check before turning off
   - condition: state
     entity_id: !input door_sensor
     state: "off"

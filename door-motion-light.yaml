@@ -29,7 +29,7 @@ blueprint:
 
     door_closed_delay:
       name: Delay After Door Closes (optional)
-      default: 0
+      default: "00:00:00"
       selector:
         duration:
 
@@ -86,7 +86,7 @@ action:
               {% set motion = blueprint.inputs.motion_sensor %}
               {{ is_state(blueprint.inputs.door_sensor, 'on') and (motion is none or is_state(motion, 'off')) }}
         sequence:
-          - delay: !input.no_motion_delay
+          - delay: !input no_motion_delay
 
   # Final safety check before turning off light
   - condition: state

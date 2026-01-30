@@ -52,7 +52,7 @@ action:
   - service: light.turn_on
     target: !input light_target
 
-  # Wait for door close OR motion stop (if motion sensor exists)
+  # Wait for either door closes OR motion stops (template trigger handles optional motion)
   - wait_for_trigger:
       - platform: state
         entity_id: !input door_sensor
@@ -60,7 +60,7 @@ action:
       - platform: template
         value_template: >
           {% set motion = blueprint.inputs.motion_sensor %}
-          {{ motion != none and is_state(motion, 'off') }}
+          {{ motion is not none and is_state(motion, 'off') }}
 
   # Decide which delay to use
   - choose:
@@ -79,7 +79,7 @@ action:
           - condition: template
             value_template: >
               {% set motion = blueprint.inputs.motion_sensor %}
-              {{ motion == none or is_state(motion, 'off') }}
+              {{ motion is none or is_state(motion, 'off') }}
 
       # -----------------------
       # Door open + no motion
@@ -88,11 +88,11 @@ action:
           - condition: template
             value_template: >
               {% set motion = blueprint.inputs.motion_sensor %}
-              {{ is_state(blueprint.inputs.door_sensor, 'on') and (motion == none or is_state(motion, 'off')) }}
+              {{ is_state(blueprint.inputs.door_sensor, 'on') and (motion is none or is_state(motion, 'off')) }}
         sequence:
           - delay: !input.no_motion_delay
 
-  # Final safety check before turning off
+  # Final safety check before turning off light
   - condition: state
     entity_id: !input.door_sensor
     state: "off"
@@ -100,7 +100,7 @@ action:
   - condition: template
     value_template: >
       {% set motion = blueprint.inputs.motion_sensor %}
-      {{ motion == none or is_state(motion, 'off') }}
+      {{ motion is none or is_state(motion, 'off') }}
 
   # Turn light OFF
   - service: light.turn_off
